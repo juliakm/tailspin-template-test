@@ -1,43 +1,77 @@
-trigger: none
+trigger:
+  - main
 
-variables:
-  buildConfiguration: 'Release'
-  webRepository: 'web'
-  tag: '$(Build.BuildId)'
+parameters:
+- name: serviceConnection
+  displayName: Azure Service Connection Name
+  type: string
+  default: newentra
 
-stages:
-- stage: 'Build'
-  displayName: 'Build and push'
-  jobs:  
-  - job: 'Build'
-    displayName: 'Build job'
-    pool:
-      vmImage: 'ubuntu-20.04'
-    steps:
-    - task: Docker@2
-      displayName: 'Build and push the image to container registry'
-      inputs:
-        command: buildAndPush
-        buildContext: $(Build.Repository.LocalPath)
-        repository: $(webRepository)
-        dockerfile: '$(Build.SourcesDirectory)/Tailspin.SpaceGame.Web/Dockerfile'
-        containerRegistry: 'Container Registry Connection'
-        tags: |
-          $(tag)
+steps:
+  - task: AzureCLI@2
+    condition: succeededOrFailed()
+    displayName: 'Azure CLI -> DevOps CLI'
+    inputs:
+      azureSubscription: '${{ parameters.serviceConnection }}'
+      scriptType: pscore
+      scriptLocation: inlineScript
+      inlineScript: |
+        Write-Host "Using logged-in Azure CLI session..."
+        Write-Host "$($PSStyle.Formatting.FormatAccent)az devops configure$($PSStyle.Reset)"
+        az devops configure --defaults organization=$(System.CollectionUri) project=$(System.TeamProject)
+        az devops configure -l
 
-- stage: 'Deploy'
-  displayName: 'Deploy the container'
-  dependsOn: Build
-  jobs:
-  - job: 'Deploy'
-    displayName: 'Deploy job'
-    pool:
-      vmImage: 'ubuntu-20.04'
-    variables:
-    - group: Release
-    steps:
-    - task: AzureWebAppContainer@1
-      inputs:
-       appName: $(WebAppName)
-       azureSubscription: 'Resource Manager - Tailspin - Space Game'
-       imageName: $(RegistryName)/$(webRepository):$(build.buildId)
+        Write-Host "`nUse Azure DevOps CLI (az devops) to list projects in the organization '$(System.CollectionUri)'..."
+        Write-Host "$($PSStyle.Formatting.FormatAccent)az devops project list$($PSStyle.Reset)"
+        az devops project list --query "value[].{Name:name, Id:id}" `
+                               -o table
+
+        Write-Host "`nUse Azure DevOps CLI (az pipelines) to list pools in the organization '$(System.CollectionUri)'..."
+        Write-Host "$($PSStyle.Formatting.FormatAccent)az pipelines pool list$($PSStyle.Reset)"
+        az pipelines pool list --query "[].{Id:id, Name:name}" `
+                               -o table
+      failOnStandardError: true
+
+# trigger: none
+
+# variables:
+#   buildConfiguration: 'Release'
+#   webRepository: 'web'
+#   tag: '$(Build.BuildId)'
+
+# stages:
+# - stage: 'Build'
+#   displayName: 'Build and push'
+#   jobs:  
+#   - job: 'Build'
+#     displayName: 'Build job'
+#     pool:
+#       vmImage: 'ubuntu-20.04'
+#     steps:
+#     - task: Docker@2
+#       displayName: 'Build and push the image to container registry'
+#       inputs:
+#         command: buildAndPush
+#         buildContext: $(Build.Repository.LocalPath)
+#         repository: $(webRepository)
+#         dockerfile: '$(Build.SourcesDirectory)/Tailspin.SpaceGame.Web/Dockerfile'
+#         containerRegistry: 'Container Registry Connection'
+#         tags: |
+#           $(tag)
+
+# - stage: 'Deploy'
+#   displayName: 'Deploy the container'
+#   dependsOn: Build
+#   jobs:
+#   - job: 'Deploy'
+#     displayName: 'Deploy job'
+#     pool:
+#       vmImage: 'ubuntu-20.04'
+#     variables:
+#     - group: Release
+#     steps:
+#     - task: AzureWebAppContainer@1
+#       inputs:
+#        appName: $(WebAppName)
+#        azureSubscription: 'Resource Manager - Tailspin - Space Game'
+#        imageName: $(RegistryName)/$(webRepository):$(build.buildId)

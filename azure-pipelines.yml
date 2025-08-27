@@ -24,7 +24,8 @@ steps:
         az devops configure --defaults organization=$(System.CollectionUri) project=$(System.TeamProject)
         az devops configure -l
 
-        ##vso[task.setvariable variable=variableGroupId]$(az pipelines variable-group list --group-name kubernetes --query [].id -o tsv)"
+        $id = az pipelines variable-group list --group-name kubernetes --query [].id -o tsv
+        Write-Host "##vso[task.setvariable variable=variableGroupId]$id"
 
   - task: AzureCLI@2
     condition: succeededOrFailed()
